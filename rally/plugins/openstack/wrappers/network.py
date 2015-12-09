@@ -366,11 +366,14 @@ class NeutronWrapper(NetworkWrapper):
                                                            network["id"])
         router_id = network["router_id"]
         if router_id:
-            self.client.remove_gateway_router(router_id)
-            for subnet_id in network["subnets"]:
-                self.client.remove_interface_router(router_id,
+            try:
+                self.client.remove_gateway_router(router_id)
+                for subnet_id in network["subnets"]:
+                    self.client.remove_interface_router(router_id,
                                                     {"subnet_id": subnet_id})
-            self.client.delete_router(router_id)
+                self.client.delete_router(router_id)
+            except:
+                pass
 
         for port in self.client.list_ports(network_id=network["id"])["ports"]:
             self.client.delete_port(port["id"])

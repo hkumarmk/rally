@@ -47,6 +47,14 @@ class Network(context.Context):
             "network_create_args": {
                 "type": "object",
                 "additionalProperties": True
+            },
+            "ports_per_network": {
+                "type": "integer",
+                "minimum": 0
+            },
+            "floating_ips_per_tenant": {
+                "type": "integer",
+                "minimum": 0
             }
         },
         "additionalProperties": False
@@ -56,7 +64,9 @@ class Network(context.Context):
         "start_cidr": "10.2.0.0/24",
         "networks_per_tenant": 1,
         "subnets_per_network": 1,
-        "network_create_args": {}
+        "network_create_args": {},
+        "ports_per_network": 10,
+        "floating_ips_per_tenant": 1
     }
 
     @logging.log_task_wrapper(LOG.info, _("Enter context: `network`"))
@@ -71,6 +81,7 @@ class Network(context.Context):
         for user, tenant_id in (utils.iterate_per_tenants(
                 self.context.get("users", []))):
             self.context["tenants"][tenant_id]["networks"] = []
+            self.context["tenants"][tenant_id]["fips"] = []
             for i in range(self.config["networks_per_tenant"]):
                 # NOTE(amaretskiy): add_router and subnets_num take effect
                 #                   for Neutron only.
@@ -80,6 +91,12 @@ class Network(context.Context):
                     subnets_num=self.config["subnets_per_network"],
                     network_create_args=self.config["network_create_args"])
                 self.context["tenants"][tenant_id]["networks"].append(network)
+                for port in range(self.config["ports_per_network"]):
+                    net_wrapper.create_port(network['id'])
+
+            for i in range(self.config["floating_ips_per_tenant"]):
+                fip = net_wrapper.create_floating_ip(tenant_id=tenant_id)
+                self.context["tenants"][tenant_id]["fips"].append(fip)
 
     @logging.log_task_wrapper(LOG.info, _("Exit context: `network`"))
     def cleanup(self):
@@ -93,3 +110,9 @@ class Network(context.Context):
                         _("Failed to delete network for tenant %s")
                         % tenant_id):
                     net_wrapper.delete_network(network)
+            for fip in tenant_ctx.get("fips", []):
+                with logging.ExceptionLogger(
+                        LOG,
+                        _("Failed to delete floating ip for tenant %s")
+                        % tenant_id):
+                    net_wrapper.delete_floating_ip(fip["id"])
