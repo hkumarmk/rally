@@ -34,15 +34,12 @@ RUN ./install_rally.sh --system --verbose --yes \
   apt-get -y autoremove && \
   apt-get clean
 
+COPY docker_entrypoint.sh /entrypoint.sh
+RUN chmod a+x /entrypoint.sh
+
 VOLUME ["/home/rally"]
 
 WORKDIR /home/rally
 USER rally
 ENV HOME /home/rally
-CMD ["bash", "--login"]
-
-RUN rally-manage db recreate
-
-# TODO(stpierre): Find a way to use `rally` as the
-# entrypoint. Currently this is complicated by the need to run
-# rally-manage to create the database.
+ENTRYPOINT ["/entrypoint.sh"]
